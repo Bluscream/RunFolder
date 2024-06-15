@@ -1,32 +1,44 @@
 ﻿using System.Diagnostics;
-using System.Reflection;
 
 namespace RunFolder;
 
 class Program {
     static void Main(string[] args) {
         string assemblyName = GetAssemblyName();
-        if (Directory.Exists(assemblyName)) {
-            ExecuteFilesInSubfolder(assemblyName);
-        } else {
-            Console.WriteLine($"Subfolder {assemblyName} does not exist.");
-            Environment.Exit(1); //throw new InvalidOperationException($"Subfolder {assemblyName} does not exist.");
-        }
+        ExecuteFilesInSubfolder(assemblyName);
     }
 
-    internal static string? GetAssemblyName() => Assembly.GetExecutingAssembly().GetName().Name;
+    internal static string? GetAssemblyName() => Path.GetFileNameWithoutExtension(Process.GetCurrentProcess().MainModule.FileName);
 
     static void ExecuteFilesInSubfolder(string subFolderPath) {
         if (!string.IsNullOrEmpty(subFolderPath) && Directory.Exists(subFolderPath)) {
-            foreach (var filePath in Directory.GetFiles(subFolderPath)) {
-                try {
-                    Process.Start(new ProcessStartInfo(filePath) { UseShellExecute = true });
-                } catch (Exception ex) {
-                    Console.WriteLine($"Failed to execute {filePath}: {ex.Message}");
+            var files = Directory.GetFiles(subFolderPath);
+            Log($"Executing {files.Length} files in {subFolderPath}");
+            foreach (var filePath in files) {
+                if (filePath.ToLowerInvariant().EndsWith(".disabled")) {
+                    Log($"Skipping {filePath}");
+                    continue;
+                } else {
+                    Log($"Executing {filePath}");
+                    try {
+                        Process.Start(new ProcessStartInfo(filePath) {
+                            UseShellExecute = true,
+                            CreateNoWindow = true, // Prevents a window from appearing
+                            WindowStyle = ProcessWindowStyle.Hidden // Hides the window
+                        });
+                        Log($"Executed {filePath}");
+                    } catch (Exception ex) {
+                        Log($"ERROR: Failed to execute {filePath}: {ex.Message}");
+                    }
                 }
             }
         } else {
-            Console.WriteLine("The specified subfolder path could not be found or is invalid.");
+            Log($"The specified subfolder {subFolderPath} could not be found or is invalid.");
+            Environment.Exit(1); //throw new InvalidOperationException($"Subfolder {assemblyName} does not exist.");
         }
+    }
+    static void Log(object message) {
+        var now = DateTime.Now;
+        Console.WriteLine($"[{now}] {message.ToString()}");
     }
 }
